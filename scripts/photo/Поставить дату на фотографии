@@ -1,7 +1,7 @@
 #!/bin/sh
 
 (
-photo-date $*
+photo-date "$*"
 ) |
 zenity \
     --progress \

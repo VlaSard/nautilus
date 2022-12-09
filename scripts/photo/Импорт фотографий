@@ -1,10 +1,9 @@
 #!/bin/sh
 
 (
-photo-import $1
+photo-import "$1"
 ) |
 zenity \
-    --modal \
     --progress \
     --title="Photo importing" \
     --text="Importing photos into an album is in progress..." \
