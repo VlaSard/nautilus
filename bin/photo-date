@@ -6,7 +6,9 @@ fontcolor="#fabb5c"
 
 for filename in $photos; do
     if test -d "$filename"; then
-        zenity --warning --text="Photo date maker\nYou can't put a date on a catalogue"
+        zenity \
+            --warning \
+            --text="Photo date maker\nYou can't put a date on a catalogue"
         exit 1
     fi
 
