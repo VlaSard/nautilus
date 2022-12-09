@@ -1,0 +1,82 @@
+#!/bin/sh
+# Объединить pdf-файлы в один документ
+# Использует pypdf
+
+# имя скрипта
+Title="pyPDF"
+
+exit_FileOk() { # файл создан
+    zenity \
+        --notification \
+        --window-icon="dialog-information" \
+        --text="$Title\nMerging completed successfully."
+    exit
+}
+
+exit_FileERR() { # файл не создан
+    zenity \
+        --notification \
+        --window-icon="dialog-error" \
+        --text="$Title\nFiles merging failed."
+    exit 1
+}
+
+exit_User() { # отменено пользователем
+    zenity \
+        --notification \
+        --window-icon="dialog-cancel" \
+        --text="$Title\nTransaction cancelled by user."
+    exit
+}
+
+exit_FileList() { # задан один файл
+    zenity \
+        --modal \
+        --title="$Title" \
+        --warning \
+        --text="Only one file cannot be merged.\nPlease select at least two files." \
+        --no-wrap
+    exit 1
+}
+
+# если выбран один файл - ошибка
+if [ ${#} -lt 2 ]; then
+    exit_FileList
+fi
+
+# запрос имени итогового документа
+FileName=$(
+    zenity \
+        --modal \
+        --entry \
+        --title="$Title" \
+        --text="Input file name..." \
+        --entry-text="${PWD##*/}"
+)
+
+# если FileName пустой
+if [ -z "$FileName" ]; then
+    exit_User
+fi
+
+# объединение документов
+(
+    pypdf -n "${FileName}" -f "${@}"
+) |
+    zenity \
+        --modal \
+        --progress \
+        --title="$Title" \
+        --text="Combining files, and adding bookmarks..." \
+        --pulsate \
+        --width=500 \
+        --no-cancel \
+        --auto-close \
+        --auto-kill
+
+# проверяем наличие созданого файла и выводим сообщение об окончании работы скрипта
+if [ -f "${FileName}.pdf" ]; then
+    exit_FileOk
+else
+    exit_FileERR
+fi

@@ -1,0 +1,153 @@
+#!/bin/bash
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+# Объединение нескольких pdf документов в один файл.
+# Добавление закладок в итоговый документ.
+#
+# Зависимости:
+#   pdfttk
+#   zenity
+#
+# author: VlaSard
+# github: https://github.com/VlaSard
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+usage() { # Вывод справки по использованию сценария
+    cat <<EOF
+Использование: ${PrgName} [ -h | --help | список файлов]
+Объединяет pdf документы и добавляет закладки в итоговый файл.
+
+Параметры:
+    [список файлов]     pdf документы для объединения
+
+        -h | --help     показать эту справку и выйти.
+EOF
+    exit
+}
+
+main() { # Объединение pdf документов
+    init "$@"
+
+    # если выбран один файл - ошибка
+    [ ${#} -lt 2 ] &&
+        zenity \
+            --modal \
+            --title="${msg_title}" \
+            --warning \
+            --text="${msg_err}" \
+            --no-wrap &&
+        exit 1
+
+    # запрос имени итогового документа
+    FileName=$(
+        zenity \
+            --modal \
+            --entry \
+            --text="$msg_title" \
+            --entry-text="${WorkDir}"
+    )
+
+    # если FileName пустой
+    if [ -z "$FileName" ]; then
+        icon="emblem-information"
+        die "${msg_exit_user}"
+    fi
+
+    # создать временную директорию
+    tmpdir
+
+    # создать файл закладок
+    {
+        NumberPage=1
+        echo "InfoBegin"
+        echo "InfoKey: Title"
+        echo "InfoValue: ${WorkDir}"
+        echo "InfoBegin"
+        echo "InfoKey: Author"
+        echo "InfoValue: ${USER^}"
+        echo "NumberOfPages: ${#FileList[@]}"
+        for BookMark in "${MarkList[@]}"; do
+            echo "BookmarkBegin"
+            echo "BookmarkTitle: ${BookMark}"
+            echo "BookmarkLevel: 1"
+            echo "BookmarkPageNumber: ${NumberPage}"
+            ((NumberPage += 1))
+        done
+    } >>"${TmpDir}"/file.info
+
+    # объединить выбранные документы и добавить закладки
+    (
+        pdftk "${@}" cat output "${TmpDir}"/"${FileName}".pdf &&
+            pdftk "${TmpDir}"/"${FileName}".pdf update_info "${TmpDir}"/file.info output "${FileName}.pdf"
+    ) |
+        zenity \
+            --modal \
+            --progress \
+            --title="${msg_title}" \
+            --text="${msg_progress}" \
+            --pulsate \
+            --width=500 \
+            --no-cancel \
+            --auto-close \
+            --auto-kill
+
+    # проверяем наличие созданого файла и выводим сообщение об окончании работы скрипта
+    if [ -f "${FileName}.pdf" ]; then
+        icon="emblem-success"
+        die "${msg_finish}"
+    else
+        icon="emblem-error"
+        die "${msg_finisherr}" 1
+    fi
+}
+
+init() { # Подготовка и инициализания
+    trap cleaning INT TERM EXIT
+
+    PrgName="${0##*/}"
+    WorkDir="${PWD##*/}"
+    FileList=("${@##*/}")
+    MarkList=("${FileList[@]/.pdf/}")
+
+    # сообщения скрипта
+    msg_title="Объединение документов..."
+    msg_err="Невозможно объединить только один файл.\nПожалуйста, выберите не менее двух файлов."
+    msg_progress="Выполняется объединение всех файлов.\nИ добавление содержания в итоговый pdf документ."
+    msg_finish="Операция успешно завершена."
+    msg_finisherr="Операция завершилась неудачей."
+    msg_exit_user="Операция отменена пользователем."
+
+    argparse "$@"
+}
+
+argparse() { # Разбор опций CLI
+    [ "${1}" = "-h" ] || [ "${1}" = "--help" ] || [ ${#} -lt 1 ] && usage
+}
+
+tmpdir() { # Создать временную директорию
+    matrix="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+    while [ "${n:=1}" -le 16 ]; do
+        DirName="$DirName${matrix:$((RANDOM % ${#matrix})):1}"
+        ((n += 1))
+    done
+
+    TmpDir="/tmp/${DirName}"
+
+    [ -d "${TmpDir}" ] || mkdir "${TmpDir}"
+}
+
+cleaning() { # Очистка при завершении работы сценария по ловушкам
+    [ -d "${TmpDir}" ] && rm -r "${TmpDir}"
+    exit
+}
+
+die() { # вывод всплывающих сообщений
+    zenity \
+        --notification \
+        --window-icon="$icon" \
+        --text="$msg_title\n$1"
+    exit "${2:-0}" # выход по умолчанию со статусом 0.
+}
+
+main "$@"

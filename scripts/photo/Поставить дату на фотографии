@@ -1,0 +1,16 @@
+#!/bin/sh
+
+(
+photo-date $*
+) |
+zenity \
+    --progress \
+    --title="Photo date maker" \
+    --text="Marking photographs with the date of the photograph" \
+    --pulsate \
+    --no-cancel \
+    --auto-close
+
+zenity \
+    --notification \
+    --text="Photo date maker\nPhoto labelling completed"
